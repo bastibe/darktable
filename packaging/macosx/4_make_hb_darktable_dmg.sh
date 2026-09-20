@@ -2,6 +2,10 @@
 #
 # Script to generate DMG image from application bundle
 #
+# Usage note:   Define CODECERT to properly sign the dmg image, and additionally
+#               NOTARYPROFILE to notarize and staple it. Both are used the same
+#               way as in 3_make_hb_darktable_package.sh, see the usage note there.
+#
 
 # Exit in case of error
 set -e -o pipefail
@@ -104,7 +108,32 @@ rm -f pack.temp.dmg
 rm -f package/Applications
 rm -rf package/.background
 
-# Sign dmg image when a certificate has been provided
+# Sign dmg image when a certificate has been provided.
+# A dmg is not code, so --deep and --options runtime do not apply to it, but the
+# secure timestamp is required for notarization just as it is for the bundle.
 if [ -n "$CODECERT" ]; then
-    codesign --deep --verbose --force --options runtime -i "org.darktable" -s "${CODECERT}" "${DMG}".dmg
+    codesign --verbose --force --timestamp -i "org.darktable" -s "${CODECERT}" "${DMG}".dmg
+fi
+
+# Notarize dmg image and staple the ticket to it.
+# Unlike an app bundle, a dmg is submitted directly and needs no zip container.
+if [ -n "$CODECERT" ] && [ -n "$NOTARYPROFILE" ]; then
+    echo "Notarizing ${DMG}.dmg (this takes a few minutes) ..."
+
+    notaryOutput=$(xcrun notarytool submit "${DMG}".dmg --keychain-profile "${NOTARYPROFILE}" --wait 2>&1) || true
+    echo "$notaryOutput"
+
+    # notarytool exits 0 even when the submission comes back Invalid, so check
+    # the reported status and pull the rejection reasons if it did not pass
+    if ! echo "$notaryOutput" | grep -q "status: Accepted"; then
+        submissionId=$(echo "$notaryOutput" | grep -m1 "  id:" | awk '{print $2}')
+        if [ -n "$submissionId" ]; then
+            echo "Notarization failed, fetching log for submission $submissionId ..."
+            xcrun notarytool log "$submissionId" --keychain-profile "${NOTARYPROFILE}" || true
+        fi
+        echo "FATAL: notarization of ${DMG}.dmg FAILED!"
+        exit 1
+    fi
+
+    xcrun stapler staple "${DMG}".dmg
 fi
