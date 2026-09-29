@@ -25,7 +25,8 @@ options=" \
     -DUSE_IMAGEMAGICK=ON \
     -DBUILD_CURVE_TOOLS=ON \
     -DBUILD_NOISE_TOOLS=ON \
-    -DUSE_AI=ON
+    -DUSE_AI=ON \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=${DTDEPLOYMENTTARGET:-26.0}
 "
 
 # Check for previous attempt and clean
