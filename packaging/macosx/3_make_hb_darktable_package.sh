@@ -15,6 +15,11 @@
 #                     --password "app-specific-password"
 #               Notarization requires CODECERT to be set as well.
 #
+#               Alternatively define NOTARYARGS to pass credentials to notarytool
+#               directly, which is how CI supplies an App Store Connect API key:
+#               $ export NOTARYARGS="--key key.p8 --key-id KEYID --issuer UUID"
+#               NOTARYARGS takes precedence over NOTARYPROFILE.
+#
 
 # Exit in case of error
 set -e -o pipefail
@@ -386,7 +391,18 @@ fi
 # Notarize app bundle and staple the ticket to it.
 # This has to happen here rather than in script 4, because script 4 builds the
 # dmg out of this directory and the app needs to carry its ticket by then.
-if [ -n "$CODECERT" ] && [ -n "$NOTARYPROFILE" ]; then
+# Credentials come either from a keychain profile (NOTARYPROFILE, convenient
+# interactively) or as raw notarytool arguments (NOTARYARGS, used by CI, which
+# passes an App Store Connect API key in from its secrets).
+if [ -n "$NOTARYARGS" ]; then
+    notaryCreds=($NOTARYARGS)
+elif [ -n "$NOTARYPROFILE" ]; then
+    notaryCreds=(--keychain-profile "$NOTARYPROFILE")
+else
+    notaryCreds=()
+fi
+
+if [ -n "$CODECERT" ] && [ ${#notaryCreds[@]} -gt 0 ]; then
     echo "Notarizing $dtWorkingDir (this takes a few minutes) ..."
 
     # Use ditto rather than zip: zip mangles the symlinks and resource forks
@@ -394,7 +410,7 @@ if [ -n "$CODECERT" ] && [ -n "$NOTARYPROFILE" ]; then
     rm -f "$dtWorkingDir".zip
     ditto -c -k --sequesterRsrc --keepParent "$dtWorkingDir" "$dtWorkingDir".zip
 
-    notaryOutput=$(xcrun notarytool submit "$dtWorkingDir".zip --keychain-profile "${NOTARYPROFILE}" --wait 2>&1) || true
+    notaryOutput=$(xcrun notarytool submit "$dtWorkingDir".zip "${notaryCreds[@]}" --wait 2>&1) || true
     echo "$notaryOutput"
     rm -f "$dtWorkingDir".zip
 
@@ -404,7 +420,7 @@ if [ -n "$CODECERT" ] && [ -n "$NOTARYPROFILE" ]; then
         submissionId=$(echo "$notaryOutput" | grep -m1 "  id:" | awk '{print $2}')
         if [ -n "$submissionId" ]; then
             echo "Notarization failed, fetching log for submission $submissionId ..."
-            xcrun notarytool log "$submissionId" --keychain-profile "${NOTARYPROFILE}" || true
+            xcrun notarytool log "$submissionId" "${notaryCreds[@]}" || true
         fi
         echo "FATAL: notarization of $dtWorkingDir FAILED!"
         exit 1

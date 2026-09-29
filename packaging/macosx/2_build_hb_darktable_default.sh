@@ -26,7 +26,7 @@ options=" \
     -DBUILD_CURVE_TOOLS=ON \
     -DBUILD_NOISE_TOOLS=ON \
     -DUSE_AI=ON \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=26.0
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=${DTDEPLOYMENTTARGET:-26.0}
 "
 
 # Check for previous attempt and clean
