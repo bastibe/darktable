@@ -117,7 +117,16 @@ fi
 
 # Notarize dmg image and staple the ticket to it.
 # Unlike an app bundle, a dmg is submitted directly and needs no zip container.
-if [ -n "$CODECERT" ] && [ -n "$NOTARYPROFILE" ]; then
+# As in script 3, credentials come from either NOTARYPROFILE or NOTARYARGS.
+if [ -n "$NOTARYARGS" ]; then
+    notaryCreds=($NOTARYARGS)
+elif [ -n "$NOTARYPROFILE" ]; then
+    notaryCreds=(--keychain-profile "$NOTARYPROFILE")
+else
+    notaryCreds=()
+fi
+
+if [ -n "$CODECERT" ] && [ ${#notaryCreds[@]} -gt 0 ]; then
     echo "Notarizing ${DMG}.dmg (this takes a few minutes) ..."
 
     notaryOutput=$(xcrun notarytool submit "${DMG}".dmg --keychain-profile "${NOTARYPROFILE}" --wait 2>&1) || true
