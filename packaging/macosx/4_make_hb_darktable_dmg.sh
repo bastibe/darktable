@@ -3,8 +3,9 @@
 # Script to generate DMG image from application bundle
 #
 # Usage note:   Define CODECERT to properly sign the dmg image, and additionally
-#               NOTARYPROFILE to notarize and staple it. Both are used the same
-#               way as in 3_make_hb_darktable_package.sh, see the usage note there.
+#               either NOTARYPROFILE or NOTARYARGS to notarize and staple it. All
+#               three are used the same way as in 3_make_hb_darktable_package.sh,
+#               see the usage note there.
 #
 
 # Exit in case of error
@@ -129,16 +130,16 @@ fi
 if [ -n "$CODECERT" ] && [ ${#notaryCreds[@]} -gt 0 ]; then
     echo "Notarizing ${DMG}.dmg (this takes a few minutes) ..."
 
-    notaryOutput=$(xcrun notarytool submit "${DMG}".dmg --keychain-profile "${NOTARYPROFILE}" --wait 2>&1) || true
+    notaryOutput=$(xcrun notarytool submit "${DMG}".dmg "${notaryCreds[@]}" --wait 2>&1) || true
     echo "$notaryOutput"
 
     # notarytool exits 0 even when the submission comes back Invalid, so check
     # the reported status and pull the rejection reasons if it did not pass
     if ! echo "$notaryOutput" | grep -q "status: Accepted"; then
-        submissionId=$(echo "$notaryOutput" | grep -m1 "  id:" | awk '{print $2}')
+        submissionId=$(echo "$notaryOutput" | grep -m1 "  id:" | awk '{print $2}') || true
         if [ -n "$submissionId" ]; then
             echo "Notarization failed, fetching log for submission $submissionId ..."
-            xcrun notarytool log "$submissionId" --keychain-profile "${NOTARYPROFILE}" || true
+            xcrun notarytool log "$submissionId" "${notaryCreds[@]}" || true
         fi
         echo "FATAL: notarization of ${DMG}.dmg FAILED!"
         exit 1

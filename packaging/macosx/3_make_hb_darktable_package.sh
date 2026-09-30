@@ -417,7 +417,7 @@ if [ -n "$CODECERT" ] && [ ${#notaryCreds[@]} -gt 0 ]; then
     # notarytool exits 0 even when the submission comes back Invalid, so check
     # the reported status and pull the rejection reasons if it did not pass
     if ! echo "$notaryOutput" | grep -q "status: Accepted"; then
-        submissionId=$(echo "$notaryOutput" | grep -m1 "  id:" | awk '{print $2}')
+        submissionId=$(echo "$notaryOutput" | grep -m1 "  id:" | awk '{print $2}') || true
         if [ -n "$submissionId" ]; then
             echo "Notarization failed, fetching log for submission $submissionId ..."
             xcrun notarytool log "$submissionId" "${notaryCreds[@]}" || true
